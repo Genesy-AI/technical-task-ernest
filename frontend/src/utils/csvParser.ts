@@ -7,6 +7,9 @@ export interface CsvLead {
   jobTitle?: string
   countryCode?: string
   companyName?: string
+  phoneNumber?: string
+  yearsAtCompany?: number
+  linkedinUrl?: string
   isValid: boolean
   errors: string[]
   rowIndex: number
@@ -16,6 +19,20 @@ export const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(email)
 }
+
+const regionNames = new Intl.DisplayNames(['en'], { type: 'region', fallback: 'code' })
+
+// A valid code is an ISO 3166-1 alpha-2 region code (case-insensitive) that the runtime recognizes.
+export const isValidCountryCode = (countryCode: string): boolean => {
+  const code = countryCode.trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(code)) return false
+
+  const regionName = regionNames.of(code)
+  return Boolean(regionName) && regionName !== code && regionName !== 'Unknown Region'
+}
+
+// Years at company is stored as an integer, so only accept whole numbers of 0 or more.
+export const isValidYearsAtCompany = (value: string): boolean => /^\d+$/.test(value.trim())
 
 export const parseCsv = (content: string): CsvLead[] => {
   if (!content?.trim()) {
@@ -49,6 +66,7 @@ export const parseCsv = (content: string): CsvLead[] => {
     if (Object.values(row).every((value) => !value)) return
 
     const lead: Partial<CsvLead> = { rowIndex: index + 2 }
+    let hasInvalidYearsAtCompany = false
 
     Object.entries(row).forEach(([header, value]) => {
       const normalizedHeader = header.toLowerCase().replace(/[^a-z]/g, '')
@@ -68,10 +86,26 @@ export const parseCsv = (content: string): CsvLead[] => {
           lead.jobTitle = trimmedValue || undefined
           break
         case 'countrycode':
-          lead.countryCode = trimmedValue || undefined
+          lead.countryCode = trimmedValue.toUpperCase() || undefined
           break
         case 'companyname':
           lead.companyName = trimmedValue || undefined
+          break
+        case 'phonenumber':
+          lead.phoneNumber = trimmedValue || undefined
+          break
+        case 'yearsinrole':
+          if (!trimmedValue) {
+            lead.yearsAtCompany = undefined
+          } else if (isValidYearsAtCompany(trimmedValue)) {
+            lead.yearsAtCompany = Number(trimmedValue)
+          } else {
+            lead.yearsAtCompany = undefined
+            hasInvalidYearsAtCompany = true
+          }
+          break
+        case 'linkedinurl':
+          lead.linkedinUrl = trimmedValue || undefined
           break
       }
     })
@@ -87,6 +121,12 @@ export const parseCsv = (content: string): CsvLead[] => {
       errors.push('Email is required')
     } else if (!isValidEmail(lead.email)) {
       errors.push('Invalid email format')
+    }
+    if (lead.countryCode && !isValidCountryCode(lead.countryCode)) {
+      errors.push('Invalid country code')
+    }
+    if (hasInvalidYearsAtCompany) {
+      errors.push('Invalid years at company')
     }
 
     data.push({

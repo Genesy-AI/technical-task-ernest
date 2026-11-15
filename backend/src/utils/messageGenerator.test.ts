@@ -74,6 +74,41 @@ describe('generateMessageFromTemplate', () => {
     })
   })
 
+  describe('phone number, years at company and LinkedIn URL', () => {
+    const leadWithNewFields: Lead = {
+      ...fullLead,
+      phoneNumber: '+1-280-754-0462',
+      yearsAtCompany: 5,
+      linkedinUrl: 'https://www.linkedin.com/in/john-doe',
+    }
+
+    it('should replace the new fields', () => {
+      const template = 'Call {phoneNumber}. {yearsAtCompany} years in. Profile: {linkedinUrl}'
+      const result = generateMessageFromTemplate(template, leadWithNewFields)
+      expect(result).toBe('Call +1-280-754-0462. 5 years in. Profile: https://www.linkedin.com/in/john-doe')
+    })
+
+    it('should insert 0 years at company instead of treating it as missing', () => {
+      const result = generateMessageFromTemplate('{yearsAtCompany} years', {
+        ...leadWithNewFields,
+        yearsAtCompany: 0,
+      })
+      expect(result).toBe('0 years')
+    })
+
+    it('should throw when a new field is missing for the lead', () => {
+      expect(() => generateMessageFromTemplate('{phoneNumber}', fullLead)).toThrow(
+        'Missing required field: phoneNumber'
+      )
+      expect(() =>
+        generateMessageFromTemplate('{yearsAtCompany}', { ...fullLead, yearsAtCompany: null })
+      ).toThrow('Missing required field: yearsAtCompany')
+      expect(() => generateMessageFromTemplate('{linkedinUrl}', fullLead)).toThrow(
+        'Missing required field: linkedinUrl'
+      )
+    })
+  })
+
   describe('error handling for missing fields', () => {
     it('should throw error when field is null', () => {
       const template = 'Hello {firstName} {lastName}!'
