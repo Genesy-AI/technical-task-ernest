@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCsv, isValidEmail } from './csvParser'
+import { parseCsv, isValidEmail, isValidCountryCode } from './csvParser'
 
 describe('isValidEmail', () => {
   it('should return true for valid email addresses', () => {
@@ -17,6 +17,23 @@ describe('isValidEmail', () => {
     expect(isValidEmail('test.example.com')).toBe(false)
     expect(isValidEmail('test@.com')).toBe(false)
     expect(isValidEmail('test@example')).toBe(false)
+  })
+})
+
+describe('isValidCountryCode', () => {
+  it('should return true for valid ISO 3166-1 alpha-2 country codes', () => {
+    expect(isValidCountryCode('ES')).toBe(true)
+    expect(isValidCountryCode('US')).toBe(true)
+    expect(isValidCountryCode('fr')).toBe(true)
+  })
+
+  it('should return false for invalid country codes', () => {
+    expect(isValidCountryCode('XXX')).toBe(false)
+    expect(isValidCountryCode('XX')).toBe(false)
+    expect(isValidCountryCode('E1')).toBe(false)
+    expect(isValidCountryCode('Spain')).toBe(false)
+    expect(isValidCountryCode('\uFFFDS')).toBe(false)
+    expect(isValidCountryCode('')).toBe(false)
   })
 })
 
@@ -152,6 +169,72 @@ John,Doe,john@example.com,,`
     expect(result[0].jobTitle).toBeUndefined()
     expect(result[0].countryCode).toBeUndefined()
     expect(result[0].isValid).toBe(true)
+  })
+
+  it('should keep valid country codes and report invalid ones as errors', () => {
+    const csv = `firstName,lastName,email,countryCode
+John,Doe,john@example.com,es
+Jane,Smith,jane@example.com,XXX`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].countryCode).toBe('ES')
+    expect(result[0].isValid).toBe(true)
+    expect(result[0].errors).toEqual([])
+    expect(result[1].countryCode).toBe('XXX')
+    expect(result[1].isValid).toBe(false)
+    expect(result[1].errors).toEqual(['Invalid country code'])
+  })
+
+  it('should parse phone number, years at company and LinkedIn URL', () => {
+    const csv = `firstName,lastName,email,phoneNumber,yearsAtCompany,linkedinUrl
+John,Doe,john@example.com, +1-280-754-0462 , 5 ,https://www.linkedin.com/in/john-doe`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].phoneNumber).toBe('+1-280-754-0462')
+    expect(result[0].yearsAtCompany).toBe(5)
+    expect(result[0].linkedinUrl).toBe('https://www.linkedin.com/in/john-doe')
+    expect(result[0].isValid).toBe(true)
+    expect(result[0].errors).toEqual([])
+  })
+
+  it('should accept header variants for the new fields, including yearsInRole from the sample files', () => {
+    const csv = `First Name,Last Name,Email,phone_number,yearsInRole,LinkedIn URL
+John,Doe,john@example.com,7549075690,0,https://www.linkedin.com/in/john-doe`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].phoneNumber).toBe('7549075690')
+    expect(result[0].yearsAtCompany).toBe(0)
+    expect(result[0].linkedinUrl).toBe('https://www.linkedin.com/in/john-doe')
+  })
+
+  it('should leave the new fields undefined when they are empty or missing', () => {
+    const csv = `firstName,lastName,email,phoneNumber,yearsAtCompany,linkedinUrl
+John,Doe,john@example.com,,,`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].phoneNumber).toBeUndefined()
+    expect(result[0].yearsAtCompany).toBeUndefined()
+    expect(result[0].linkedinUrl).toBeUndefined()
+    expect(result[0].isValid).toBe(true)
+  })
+
+  it('should report years at company that are not a whole number of 0 or more', () => {
+    const csv = `firstName,lastName,email,yearsAtCompany
+John,Doe,john@example.com,abc
+Jane,Smith,jane@example.com,2.5
+Jim,Beam,jim@example.com,-1`
+
+    const result = parseCsv(csv)
+
+    for (const lead of result) {
+      expect(lead.yearsAtCompany).toBeUndefined()
+      expect(lead.isValid).toBe(false)
+      expect(lead.errors).toEqual(['Invalid years at company'])
+    }
   })
 
   it('should preserve row index correctly', () => {

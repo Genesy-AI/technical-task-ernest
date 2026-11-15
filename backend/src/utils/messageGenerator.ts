@@ -5,6 +5,9 @@ export interface Lead {
   jobTitle?: string | null
   companyName?: string | null
   countryCode?: string | null
+  phoneNumber?: string | null
+  yearsAtCompany?: number | null
+  linkedinUrl?: string | null
 }
 
 export function generateMessageFromTemplate(template: string, lead: Lead): string {
@@ -17,6 +20,10 @@ export function generateMessageFromTemplate(template: string, lead: Lead): strin
     jobTitle: lead.jobTitle,
     companyName: lead.companyName,
     countryCode: lead.countryCode,
+    phoneNumber: lead.phoneNumber,
+    // Numbers become text; 0 is a real value, only null/undefined count as missing.
+    yearsAtCompany: lead.yearsAtCompany == null ? lead.yearsAtCompany : String(lead.yearsAtCompany),
+    linkedinUrl: lead.linkedinUrl,
   }
 
   const templateVariables = template.match(/\{(\w+)\}/g) || []
